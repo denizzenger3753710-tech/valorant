@@ -2,51 +2,51 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Valorant JS - Poligon</title>
+    <title>Valorant JS - Pro Poligon</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #0b141a; font-family: 'Segoe UI', sans-serif; }
-        
-        /* TEMİZ VALORANT ARAYÜZÜ */
         #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 8px; height: 8px;
-            border: 2px solid #00ffcc; transform: translate(-50%, -50%); pointer-events: none;
+            position: absolute; top: 50%; left: 50%; width: 10px; height: 10px;
+            border: 2px solid #00ffcc; transform: translate(-50%, -50%); pointer-events: none; z-index: 5;
         }
-        
         #hud { position: absolute; width: 100%; height: 100%; pointer-events: none; color: white; }
-        
         .ammo-box { position: absolute; bottom: 40px; right: 60px; text-align: right; }
-        .ammo-box h1 { font-size: 60px; margin: 0; font-weight: bold; letter-spacing: -2px; }
+        .kill-count { position: absolute; top: 20px; right: 40px; font-size: 24px; color: #ff4655; font-weight: bold; }
         
         #settings { 
-            position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); 
-            padding: 15px; border-radius: 4px; color: white; pointer-events: auto; border: 1px solid #333;
+            position: absolute; top: 20px; left: 20px; background: rgba(15, 25, 35, 0.9); 
+            padding: 15px; border-radius: 4px; color: white; pointer-events: auto; border: 1px solid #ff4655;
         }
+        input[type="number"] { width: 50px; background: #222; color: #00ffcc; border: 1px solid #444; padding: 5px; }
+        .btn-small { background: #333; color: white; border: 1px solid #555; padding: 5px; cursor: pointer; margin-top: 5px; font-size: 12px; }
 
         #start-screen {
             position: absolute; width: 100%; height: 100%; background: #0b141a;
             display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100;
         }
-        .btn { padding: 15px 40px; background: #ff4655; color: white; border: none; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="start-screen" onclick="startGame()">
-        <h1 style="letter-spacing: 5px;">POLİGON</h1>
-        <button class="btn">GİRİŞ YAP</button>
+        <h1 style="letter-spacing: 5px; color: #ff4655;">POLİGON v1.2</h1>
+        <p>BAŞLAMAK İÇİN TIKLA</p>
     </div>
 
     <div id="settings">
-        HASSASİYET: <br>
-        <input type="range" id="sens" min="0.1" max="4.0" step="0.1" value="1.0">
+        SENS: <input type="number" id="sensInput" step="0.1" value="1.0">
+        <br>
+        <button class="btn-small" onclick="changeCrosshair()">CROSS DEĞİŞTİR</button>
+        <div style="font-size: 10px; margin-top: 10px; color: #888;">B: Market | R: Reload | X: Ulti</div>
     </div>
 
-    <div id="crosshair"></div>
+    <div id="crosshair" id="ch-box"></div>
     
     <div id="hud">
+        <div class="kill-count">KILLS: <span id="score">0</span></div>
         <div class="ammo-box">
-            <div style="color: #ff4655; font-weight: bold;">PHANTOM</div>
-            <h1><span id="ammo-count">25</span></h1>
+            <div style="color: #00ffcc; font-weight: bold;">PHANTOM</div>
+            <h1 style="font-size: 60px; margin:0;"><span id="ammo-count">25</span></h1>
         </div>
     </div>
 
@@ -57,77 +57,90 @@
     <script type="module">
         import * as THREE from 'three';
 
-        let ammo = 25;
+        let ammo = 25, score = 0;
         let sensitivity = 0.002;
         const enemies = [];
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // --- SES SİSTEMİ (KESİN ÇÖZÜM) ---
+        // --- HASSASİYET HAFIZA SİSTEMİ ---
+        const sensInput = document.getElementById('sensInput');
+        const savedSens = localStorage.getItem('valSens');
+        if(savedSens) {
+            sensInput.value = savedSens;
+            sensitivity = 0.002 * parseFloat(savedSens);
+        }
+
+        sensInput.addEventListener('change', (e) => {
+            let val = parseFloat(e.target.value);
+            sensitivity = 0.002 * val;
+            localStorage.setItem('valSens', val); // Hafızaya al
+        });
+
+        // --- CROSSHAIR DEĞİŞTİRME ---
+        let colors = ['#00ffcc', '#ff0000', '#ffffff', '#ffff00'];
+        let colorIdx = 0;
+        window.changeCrosshair = () => {
+            colorIdx = (colorIdx + 1) % colors.length;
+            document.getElementById('crosshair').style.borderColor = colors[colorIdx];
+        };
+
+        // --- SES ---
         function playShootSound() {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = 'square';
-            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }
 
-        // --- SAHNE ---
+        // --- SAHNE KURULUMU ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x2b2b2b); // Poligon grisi
+        scene.background = new THREE.Color(0x1a1f24);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // ZEMİN VE AYDINLATMA
-        scene.add(new THREE.GridHelper(100, 50, 0x444444, 0x222222));
-        scene.add(new THREE.AmbientLight(0xffffff, 1));
+        scene.add(new THREE.GridHelper(100, 40, 0x333333, 0x222222));
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
-        // --- BOTLAR ---
+        // --- BOT SPAWN ---
         function spawnBot() {
-            const geo = new THREE.BoxGeometry(1, 2, 0.5);
-            const mat = new THREE.MeshPhongMaterial({ color: 0x00ffcc }); // Sage Yeşili Botlar
-            const bot = new THREE.Mesh(geo, mat);
-            bot.position.set((Math.random()-0.5)*20, 1, -Math.random()*20 - 5);
+            const bot = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 2, 0.5),
+                new THREE.MeshPhongMaterial({ color: 0x00ffcc })
+            );
+            bot.position.set((Math.random()-0.5)*25, 1, -Math.random()*20 - 5);
             scene.add(bot);
             enemies.push(bot);
         }
         for(let i=0; i<5; i++) spawnBot();
 
-        // --- SİLAH MODELİ (ELDE DURUŞ) ---
-        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.6), new THREE.MeshPhongMaterial({color: 0x111111}));
-        gun.position.set(0.35, -0.25, -0.5);
+        // --- SİLAH ---
+        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.7), new THREE.MeshPhongMaterial({color: 0x111111}));
+        gun.position.set(0.35, -0.25, -0.6);
         camera.add(gun);
         scene.add(camera);
 
-        // --- MOUSE KONTROLLERİ (SIFIR HATA) ---
+        // --- KONTROLLER ---
         window.startGame = () => {
             document.getElementById('start-screen').style.display = 'none';
             document.body.requestPointerLock();
         };
 
-        document.getElementById('sens').addEventListener('input', (e) => {
-            sensitivity = 0.002 * parseFloat(e.target.value);
-        });
-
         document.addEventListener('mousemove', (e) => {
             if (document.pointerLockElement) {
-                // Kamera rotasyonunu doğrudan mouse hareketine bağla
                 camera.rotation.y -= e.movementX * sensitivity;
-                // X ekseni (yukarı-aşağı) limitli
                 let targetX = camera.rotation.x - e.movementY * sensitivity;
                 camera.rotation.x = Math.max(-1.5, Math.min(1.5, targetX));
-                
-                // Z eksenini (yamulmayı) her seferinde sıfırla kanka
-                camera.rotation.z = 0;
+                camera.rotation.z = 0; // Yamulmayı önleyen altın vuruş
             }
         });
 
-        // --- ATEŞ ETME ---
         document.addEventListener('mousedown', () => {
             if (document.pointerLockElement && ammo > 0) {
                 ammo--;
@@ -138,8 +151,9 @@
                 ray.setFromCamera(new THREE.Vector2(0,0), camera);
                 const hits = ray.intersectObjects(enemies);
                 if (hits.length > 0) {
-                    const hitBot = hits[0].object;
-                    hitBot.position.set((Math.random()-0.5)*20, 1, -Math.random()*20 - 5);
+                    score++;
+                    document.getElementById('score').innerText = score;
+                    hits[0].object.position.set((Math.random()-0.5)*25, 1, -Math.random()*20 - 5);
                 }
             }
         });
@@ -148,7 +162,6 @@
             requestAnimationFrame(animate);
             if (document.pointerLockElement) {
                 const speed = 0.12;
-                // Basit hareket (W-A-S-D)
                 if (keys['KeyW']) camera.translateZ(-speed);
                 if (keys['KeyS']) camera.translateZ(speed);
                 if (keys['KeyA']) camera.translateX(-speed);
@@ -162,6 +175,7 @@
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
             if(e.code === 'KeyR') { ammo = 25; document.getElementById('ammo-count').innerText = ammo; }
+            if(e.code === 'KeyB') console.log("Market Açıldı");
         });
         document.addEventListener('keyup', (e) => keys[e.code] = false);
 
