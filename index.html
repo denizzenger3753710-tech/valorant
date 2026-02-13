@@ -2,35 +2,42 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Valorant JS Clone - Dev Mode</title>
+    <title>Valorant JS - Versiyon 0.2</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Arial', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         #crosshair {
             position: absolute; top: 50%; left: 50%;
-            width: 10px; height: 10px; border: 2px solid #00ff00;
+            width: 12px; height: 12px; border: 2px solid #00ff00;
             transform: translate(-50%, -50%); pointer-events: none;
+            border-radius: 50%;
         }
         #ui {
-            position: absolute; bottom: 20px; left: 20px; color: white;
-            text-shadow: 2px 2px #000;
+            position: absolute; bottom: 30px; left: 30px; color: white;
+            text-shadow: 2px 2px #000; letter-spacing: 2px;
         }
         #instructions {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; text-align: center; background: rgba(0,0,0,0.7); padding: 20px;
+            color: white; text-align: center; background: rgba(0,0,0,0.85); 
+            padding: 30px; border: 2px solid #ff4655; cursor: pointer;
+        }
+        .flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; pointer-events: none;
         }
     </style>
 </head>
 <body>
 
     <div id="crosshair"></div>
+    <div id="flash-effect" class="flash"></div>
     <div id="ui">
-        <h2>HP: 100 | AMMO: 25</h2>
-        <p>Yetenekler: [Q] [E] [C] [X]</p>
+        <h1 id="ammo">AMMO: 25 / ∞</h1>
+        <p style="color: #ff4655; font-weight: bold;">[SOL TIK] ATEŞ ET | [WASD] HAREKET</p>
     </div>
     <div id="instructions" onclick="this.style.display='none'; document.body.requestPointerLock();">
-        <h1>VALORANT JS</h1>
-        <p>Başlamak için tıkla</p>
-        <p>(WASD: Hareket | Mouse: Bakış & Ateş)</p>
+        <h1 style="color: #ff4655;">VALORANT JS CLONE</h1>
+        <p>Hata Düzeltildi & Silah Eklendi</p>
+        <p>Başlamak için Tıkla</p>
     </div>
 
     <script type="importmap">
@@ -40,96 +47,81 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // 1. SAHNE VE KAMERA KURULUMU
+        // --- SAHNE KURULUMU ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Gökyüzü mavisi
+        scene.background = new THREE.Color(0x1a1a1a);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // 2. IŞIKLANDIRMA
-        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-        scene.add(light);
+        // --- IŞIKLANDIRMA ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        camera.add(pointLight); // Işık kamerayı takip etsin
+        scene.add(camera);
 
-        // 3. ZEMİN VE BASİT HARİTA
-        const floorGeo = new THREE.PlaneGeometry(100, 100);
-        const floorMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
+        // --- ZEMİN VE DUVARLAR ---
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(200, 200),
+            new THREE.MeshPhongMaterial({ color: 0x333333 })
+        );
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
 
-        // Engel (Kutu) ekleyelim
-        const boxGeo = new THREE.BoxGeometry(2, 4, 2);
-        const boxMat = new THREE.MeshPhongMaterial({ color: 0xff4444 });
-        const target = new THREE.Mesh(boxGeo, boxMat);
-        target.position.set(0, 2, -10);
-        scene.add(target);
+        // --- SİLAH MODELİ (Basit bir Phantom/Vandal taslağı) ---
+        const gunGroup = new THREE.Group();
+        const bodyGeo = new THREE.BoxGeometry(0.2, 0.3, 1);
+        const gunMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+        const gunBody = new THREE.Mesh(bodyGeo, gunMat);
+        
+        const barrelGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.8);
+        const barrel = new THREE.Mesh(barrelGeo, gunMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.z = -0.7;
+        
+        gunGroup.add(gunBody);
+        gunGroup.add(barrel);
+        
+        // Silahı kameranın önüne yerleştir
+        gunGroup.position.set(0.4, -0.4, -0.8); 
+        camera.add(gunGroup);
 
-        // 4. KONTROLLER
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
+        // --- HAREKET VE KONTROLLER ---
+        let keys = {};
+        document.addEventListener('keydown', (e) => keys[e.code] = true);
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        document.addEventListener('keydown', (e) => {
-            if(e.code === 'KeyW') moveForward = true;
-            if(e.code === 'KeyS') moveBackward = true;
-            if(e.code === 'KeyA') moveLeft = true;
-            if(e.code === 'KeyD') moveRight = true;
-        });
-        document.addEventListener('keyup', (e) => {
-            if(e.code === 'KeyW') moveForward = false;
-            if(e.code === 'KeyS') moveBackward = false;
-            if(e.code === 'KeyA') moveLeft = false;
-            if(e.code === 'KeyD') moveRight = false;
-        });
-
-        // Mouse Hareketleri
         document.addEventListener('mousemove', (e) => {
             if (document.pointerLockElement === document.body) {
                 camera.rotation.y -= e.movementX * 0.002;
                 camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
             }
         });
 
-        // Ateş Etme
-        document.addEventListener('mousedown', () => {
-            if (document.pointerLockElement === document.body) {
-                // Buraya ateş efekti gelecek
-                console.log("Ateş edildi!");
-            }
-        });
+        // --- ATEŞ ETME MEKANİĞİ ---
+        function shoot() {
+            // Silah tepme efekti (Kickback)
+            gunGroup.position.z += 0.1;
+            
+            // Namlu ucundan mermi izi (Raycast)
+            const raycaster = new THREE.Raycaster();
+            const center = new THREE.Vector2(0, 0); // Ekran ortası
+            raycaster.setFromCamera(center, camera);
 
-        camera.position.y = 1.6; // İnsan boyu
+            // Mermi izi (Tracer)
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xffff00 });
+            const points = [];
+            points.push(new THREE.Vector3(0.4, -0.4, -1)); // Namlu yaklaşık pozisyon
+            points.push(new THREE.Vector3(0, 0, -20)); // Gittiği yer
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(lineGeo, lineMat);
+            camera.add(line);
+            
+            // İzi kısa süre sonra sil
+            setTimeout(() => camera.remove(line), 50);
 
-        // 5. OYUN DÖNGÜSÜ (ANIMATION LOOP)
-        function animate() {
-            requestAnimationFrame(animate);
-
-            if (document.pointerLockElement === document.body) {
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveRight) - Number(moveLeft);
-                direction.normalize();
-
-                if (moveForward || moveBackward) velocity.z -= direction.z * 0.01;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 0.01;
-
-                camera.translateX(-velocity.x);
-                camera.translateZ(-velocity.z);
-                
-                velocity.multiplyScalar(0.9); // Sürtünme
-            }
-
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        // Ekran boyutu değişirse güncelle
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-</body>
-</html>
+            // Ekran flaşı
+            const flash =
