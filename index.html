@@ -2,74 +2,49 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Valorant JS Projesi</title>
+    <title>Valorant JS - Neon Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #101823; font-family: 'Segoe UI', sans-serif; }
-        
-        /* Valorant Tarzı Crosshair */
+        body { margin: 0; overflow: hidden; background-color: #050a14; font-family: 'Segoe UI', sans-serif; }
         #crosshair {
-            position: absolute; top: 50%; left: 50%;
-            width: 4px; height: 4px; background: #00ff00;
-            outline: 1px solid rgba(0,0,0,0.5);
+            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
+            background: #00ffcc; outline: 1px solid rgba(0,0,0,0.5);
             transform: translate(-50%, -50%); pointer-events: none;
         }
-
-        /* Modern Arayüz (HUD) */
-        #hud {
-            position: absolute; width: 100%; height: 100%;
-            pointer-events: none; color: white;
+        #hud { position: absolute; width: 100%; height: 100%; pointer-events: none; color: white; }
+        .hp-box { position: absolute; bottom: 40px; left: 60px; border-left: 5px solid #00ffcc; padding-left: 15px; }
+        .ammo-box { position: absolute; bottom: 40px; right: 60px; text-align: right; border-right: 5px solid #ff4655; padding-right: 15px; }
+        .abilities { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+        .ability { 
+            width: 50px; height: 50px; border: 2px solid rgba(0,255,204,0.3);
+            background: rgba(0,20,40,0.6); display: flex; align-items: center; justify-content: center; font-weight: bold;
         }
-        .ammo-box {
-            position: absolute; bottom: 40px; right: 60px;
-            text-align: right; border-right: 5px solid #ff4655; padding-right: 15px;
-        }
-        .hp-box {
-            position: absolute; bottom: 40px; left: 60px;
-            border-left: 5px solid #00ffcc; padding-left: 15px;
-        }
-        .abilities {
-            position: absolute; bottom: 40px; left: 50%;
-            transform: translateX(-50%); display: flex; gap: 10px;
-        }
-        .ability {
-            width: 50px; height: 50px; border: 2px solid rgba(255,255,255,0.3);
-            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
-        }
-
+        .neon-energy { width: 200px; height: 10px; background: rgba(255,255,255,0.2); position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); }
+        #energy-bar { width: 100%; height: 100%; background: #00ffcc; transition: width 0.1s; }
         #start-screen {
-            position: absolute; width: 100%; height: 100%;
-            background: rgba(15, 25, 35, 0.9); display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
-            color: white; z-index: 10; cursor: pointer;
+            position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, #00ffcc33 0%, #050a14 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 10; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
     <div id="start-screen" onclick="startGame()">
-        <h1 style="color: #ff4655; font-size: 50px;">BAŞLAT</h1>
-        <p>SESLERİ AKTİF ETMEK İÇİN TIKLA</p>
+        <h1 style="color: #00ffcc; font-size: 50px; text-shadow: 0 0 20px #00ffcc;">NEON AKTİF</h1>
+        <p>BAŞLAMAK İÇİN TIKLA KANKA</p>
     </div>
 
     <div id="crosshair"></div>
     
     <div id="hud">
-        <div class="hp-box">
-            <div style="font-size: 12px; opacity: 0.7;">SAĞLIK</div>
-            <div style="font-size: 40px; font-weight: bold;">100</div>
-        </div>
-        
+        <div class="neon-energy"><div id="energy-bar"></div></div>
+        <div class="hp-box"><div>SAĞLIK</div><div style="font-size: 40px; font-weight: bold;">100</div></div>
         <div class="abilities">
             <div class="ability">C</div>
-            <div class="ability">Q</div>
-            <div class="ability" style="border-color: #ff4655;">E</div>
+            <div class="ability" id="skill-q">Q</div>
+            <div class="ability" id="skill-e" style="border-color: #00ffcc; color: #00ffcc;">E</div>
             <div class="ability">X</div>
         </div>
-
-        <div class="ammo-box">
-            <div style="font-size: 12px; opacity: 0.7;">PHANTOM</div>
-            <div style="font-size: 40px; font-weight: bold;"><span id="ammo-count">25</span> / 75</div>
-        </div>
+        <div class="ammo-box"><div>PHANTOM</div><div style="font-size: 40px; font-weight: bold;"><span id="ammo-count">25</span> / 75</div></div>
     </div>
 
     <script type="importmap">
@@ -79,49 +54,61 @@
     <script type="module">
         import * as THREE from 'three';
 
-        let ammo = 25;
+        let ammo = 25, energy = 100, isSprinting = false;
+        const enemies = [];
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // --- SES ÜRETİCİ (Dosya gerektirmeden ateş sesi yapar) ---
-        function playShootSound() {
+        // --- SESLER ---
+        function playSound(freq, type, duration, vol) {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
         }
 
-        // --- SAHNE KURULUMU ---
+        // --- SAHNE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x202933); // Valorant koyu mavi/gri tonu
-        scene.fog = new THREE.Fog(0x202933, 10, 50);
-
+        scene.background = new THREE.Color(0x050a14);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- DÜNYA (GRID VE ZEMİN) ---
-        const grid = new THREE.GridHelper(100, 50, 0xff4655, 0x444444);
-        scene.add(grid);
+        // --- DÜNYA ---
+        scene.add(new THREE.GridHelper(200, 60, 0x00ffcc, 0x112233));
+        const light = new THREE.PointLight(0x00ffcc, 1, 100);
+        camera.add(light);
+        scene.add(camera);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
+        // --- DÜŞMANLAR (BOTLAR) ---
+        function createEnemy() {
+            const geo = new THREE.BoxGeometry(1, 2, 1);
+            const mat = new THREE.MeshPhongMaterial({ color: 0xff4655, emissive: 0xff0000, emissiveIntensity: 0.5 });
+            const bot = new THREE.Mesh(geo, mat);
+            bot.position.set((Math.random()-0.5)*40, 1, -Math.random()*40 - 10);
+            scene.add(bot);
+            enemies.push(bot);
+        }
+        for(let i=0; i<10; i++) createEnemy();
 
-        // --- SİLAH ---
-        const gun = new THREE.Mesh(
-            new THREE.BoxGeometry(0.15, 0.2, 0.8),
-            new THREE.MeshPhongMaterial({ color: 0x0f1923 })
-        );
+        // --- SİLAH VE EKRAN SALLANMASI ---
+        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.7), new THREE.MeshPhongMaterial({ color: 0x050a14 }));
         gun.position.set(0.35, -0.3, -0.6);
         camera.add(gun);
-        scene.add(camera);
+
+        let shakeAmount = 0;
+        function applyShake() {
+            if (shakeAmount > 0) {
+                camera.position.x += (Math.random() - 0.5) * shakeAmount;
+                camera.position.y += (Math.random() - 0.5) * shakeAmount;
+                shakeAmount *= 0.9;
+            }
+        }
 
         // --- KONTROLLER ---
         let keys = {};
@@ -131,34 +118,34 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
         };
 
-        document.addEventListener('keydown', (e) => keys[e.code] = true);
-        document.addEventListener('keyup', (e) => keys[e.code] = false);
-        document.addEventListener('mousemove', (e) => {
-            if (document.pointerLockElement) {
-                camera.rotation.y -= e.movementX * 0.002;
-                camera.rotation.x -= e.movementY * 0.002;
-                camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
-            }
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if(e.code === 'KeyE' && energy > 20) isSprinting = !isSprinting; // Neon Sprint Toggle
+            if(e.code === 'KeyQ') playSound(400, 'sawtooth', 0.3, 0.1); // Neon Bolt Ses
         });
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
 
         // --- ATEŞ ETME ---
         document.addEventListener('mousedown', () => {
             if (document.pointerLockElement && ammo > 0) {
                 ammo--;
                 document.getElementById('ammo-count').innerText = ammo;
-                playShootSound();
-                
-                // Tepme
-                gun.position.z += 0.05;
-                camera.rotation.x += 0.005;
+                playSound(200, 'square', 0.1, 0.1);
+                shakeAmount = 0.1; // Ateş edince ekran sallansın
 
-                // Mermi İzi
                 const ray = new THREE.Raycaster();
                 ray.setFromCamera(new THREE.Vector2(0,0), camera);
-                const points = [new THREE.Vector3(0.3, -0.3, -0.5), new THREE.Vector3(0,0,-10)];
-                const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({color: 0xffffff}));
-                camera.add(line);
-                setTimeout(() => camera.remove(line), 30);
+                const intersects = ray.intersectObjects(enemies);
+
+                if (intersects.length > 0) {
+                    const hitBot = intersects[0].object;
+                    hitBot.material.color.set(0xffffff); // Vurunca beyaz olsun
+                    playSound(800, 'sine', 0.05, 0.2); // Hit sesi
+                    setTimeout(() => {
+                        hitBot.position.set((Math.random()-0.5)*40, 1, -Math.random()*40 - 10);
+                        hitBot.material.color.set(0xff4655);
+                    }, 100);
+                }
             }
         });
 
@@ -166,17 +153,36 @@
         function animate() {
             requestAnimationFrame(animate);
             if (document.pointerLockElement) {
-                const speed = 0.1;
-                if (keys['KeyW']) camera.translateZ(-speed);
-                if (keys['KeyS']) camera.translateZ(speed);
-                if (keys['KeyA']) camera.translateX(-speed);
-                if (keys['KeyD']) camera.translateX(speed);
+                // Neon Hız Mekaniği
+                let currentSpeed = (isSprinting && energy > 0) ? 0.3 : 0.12;
+                if (isSprinting && energy > 0) {
+                    energy -= 0.5;
+                    shakeAmount = 0.02; // Koşarken hafif sarsıntı
+                } else {
+                    isSprinting = false;
+                    if(energy < 100) energy += 0.2;
+                }
+                document.getElementById('energy-bar').style.width = energy + '%';
+
+                if (keys['KeyW']) camera.translateZ(-currentSpeed);
+                if (keys['KeyS']) camera.translateZ(currentSpeed);
+                if (keys['KeyA']) camera.translateX(-currentSpeed);
+                if (keys['KeyD']) camera.translateX(currentSpeed);
+                
                 camera.position.y = 1.6;
-                gun.position.z += (-0.6 - gun.position.z) * 0.1; // Silahı geri çekme
+                applyShake();
             }
             renderer.render(scene, camera);
         }
         animate();
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
+            }
+        });
     </script>
 </body>
 </html>
