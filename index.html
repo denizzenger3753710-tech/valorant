@@ -2,11 +2,11 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>ZARTARANT v12.0 - ION EDITION</title>
+    <title>ZARTARANT v12.1 - MOUSE FIX</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #eee; font-family: 'Arial Black', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #eee; font-family: 'Arial Black', sans-serif; cursor: none; }
         #bela-overlay { position: absolute; top: 30%; width: 100%; text-align: center; color: #ff4655; font-size: 80px; text-shadow: 0 0 20px #ff0000; z-index: 9000; display: none; pointer-events: none; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid #0f0; transform: translate(-50%, -50%); pointer-events: none; z-index: 100; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid #0f0; transform: translate(-50%, -50%); pointer-events: none; z-index: 100; }
         .ui-panel { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,10,25,0.98); border: 3px solid #ff4655; color: white; padding: 20px; display: none; z-index: 10000; text-align: center; min-width: 250px; }
         .opt { padding: 12px; margin: 5px; background: #1a1a1a; cursor: pointer; border: 1px solid #444; }
         .opt:hover { background: #ff4655; }
@@ -17,17 +17,17 @@
 <body>
 
     <div id="start-screen" onclick="initGame()">
-        <h1>ZARTARANT v12.0</h1>
+        <h1>ZARTARANT v12.1</h1>
         <p>DENİZ ZENGER SUNAR</p>
-        <div style="background: #ff4655; color: #fff; padding: 15px 30px; margin-top: 20px;">BAŞLAT (TIKLA)</div>
+        <div style="background: #ff4655; color: #fff; padding: 15px 30px; margin-top: 20px; border-radius: 5px;">OYUNU BAŞLAT (TIKLA)</div>
+        <p style="font-size: 12px; color: #555; margin-top: 10px;">Hareket: W-A-S-D | Panel: INSERT | Market: B</p>
     </div>
 
     <div id="bela-overlay">BELA</div>
 
     <div id="h-panel" class="ui-panel">
         <h3>HACK MENU</h3>
-        <div class="opt" onclick="applySkin('ION')">İON SKIN (NEW)</div>
-        <div class="opt" onclick="applySkin('PRIME')">ASİL SKIN</div>
+        <div class="opt" onclick="applySkin('ION')">İON SKIN</div>
         <div class="opt" onclick="toggleCheat('esp')">ESP: <span id="s-esp">KAPALI</span></div>
         <div class="opt" onclick="toggleCheat('aim')">AIMBOT: <span id="s-aim">KAPALI</span></div>
         <div class="opt" onclick="closePanels()">KAPAT</div>
@@ -35,8 +35,8 @@
 
     <div id="m-panel" class="ui-panel" style="border-color: #00ffff;">
         <h3 style="color:#00ffff">MARKET (B)</h3>
-        <div class="opt" onclick="buy('VANDAL')">VANDAL</div>
-        <div class="opt" onclick="buy('ION VANDAL')">ION VANDAL</div>
+        <div class="opt" onclick="buy('ION')">ION VANDAL</div>
+        <div class="opt" onclick="buy('PRIME')">PRIME VANDAL</div>
         <div class="opt" onclick="closePanels()">KAPAT</div>
     </div>
 
@@ -52,52 +52,77 @@
         import * as THREE from 'three';
 
         let cheats = {esp: false, aim: false}, enemies = [], keys = {}, kills = 0, hp = 100, gameStarted = false;
-        const scene = new THREE.Scene(); scene.background = new THREE.Color(0xcccccc); // Açık gri gökyüzü
+        const scene = new THREE.Scene(); scene.background = new THREE.Color(0xddeeff); 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         camera.rotation.order = 'YXZ';
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- IŞIKLANDIRMA (ARTIK KARANLIK DEĞİL) ---
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        // IŞIKLANDIRMA
+        scene.add(new THREE.AmbientLight(0xffffff, 1));
         const sun = new THREE.DirectionalLight(0xffffff, 1);
-        sun.position.set(10, 20, 10);
-        scene.add(sun);
+        sun.position.set(10, 20, 10); scene.add(sun);
 
         // ZEMİN
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({color: 0x888888}));
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({color: 0x999999}));
         floor.rotation.x = -Math.PI/2; scene.add(floor);
 
-        // DENİZ ZENGER İMZASI
+        // İMZA
         const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
         canvas.width = 512; canvas.height = 64; ctx.fillStyle = '#ff4655'; ctx.font = 'bold 30px Arial';
         ctx.fillText('DENİZ ZENGER SUNAR', 80, 40);
         const sign = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.5), new THREE.MeshBasicMaterial({map: new THREE.CanvasTexture(canvas), transparent: true}));
         sign.position.set(0, 7, -15); scene.add(sign);
 
-        // SİLAH VE ION SKINI
+        // SİLAH
         const gunGroup = new THREE.Group();
         const gBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.7), new THREE.MeshStandardMaterial({color: 0x222222}));
-        const gCore = new THREE.Mesh(new THREE.SphereGeometry(0.04), new THREE.MeshBasicMaterial({color: 0x00ffff}));
+        const gCore = new THREE.Mesh(new THREE.SphereGeometry(0.04), new THREE.MeshBasicMaterial({color: 0xff4655}));
         gCore.position.set(0, 0.05, -0.1); gunGroup.add(gBody, gCore);
         gunGroup.position.set(0.4, -0.4, -0.6); camera.add(gunGroup); scene.add(camera);
 
-        window.initGame = () => { document.body.requestPointerLock(); document.getElementById('start-screen').style.display = 'none'; gameStarted = true; };
-        window.closePanels = () => { document.querySelectorAll('.ui-panel').forEach(p => p.style.display = 'none'); document.body.requestPointerLock(); };
+        // MOUSE HAREKETİ (KESİN ÇÖZÜM)
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                camera.rotation.y -= e.movementX * 0.002;
+                let newX = camera.rotation.x - e.movementY * 0.002;
+                camera.rotation.x = Math.max(-1.5, Math.min(1.5, newX));
+            }
+        });
+
+        window.initGame = () => { 
+            document.body.requestPointerLock(); 
+            document.getElementById('start-screen').style.display = 'none'; 
+            gameStarted = true; 
+        };
+
+        window.closePanels = () => { 
+            document.querySelectorAll('.ui-panel').forEach(p => p.style.display = 'none'); 
+            document.body.requestPointerLock(); 
+        };
 
         window.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-            if(e.code === 'Insert') { document.getElementById('h-panel').style.display = 'block'; document.exitPointerLock(); }
-            if(e.code === 'KeyB') { document.getElementById('m-panel').style.display = 'block'; document.exitPointerLock(); }
+            if(e.code === 'Insert') {
+                const p = document.getElementById('h-panel');
+                p.style.display = p.style.display === 'block' ? 'none' : 'block';
+                if(p.style.display === 'block') document.exitPointerLock(); else document.body.requestPointerLock();
+            }
+            if(e.code === 'KeyB') {
+                const p = document.getElementById('m-panel');
+                p.style.display = p.style.display === 'block' ? 'none' : 'block';
+                if(p.style.display === 'block') document.exitPointerLock(); else document.body.requestPointerLock();
+            }
         });
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
         window.applySkin = (s) => {
-            if(s === 'ION') { gBody.material.color.setHex(0xffffff); gCore.material.color.setHex(0x00ffff); }
-            if(s === 'PRIME') { gBody.material.color.setHex(0xd4af37); gCore.material.color.setHex(0xffffff); }
+            if(s === 'ION') { gBody.material.color.setHex(0xffffff); gCore.material.color.setHex(0x00ffff); document.getElementById('wpn').innerText = "ION VANDAL"; }
+            if(s === 'PRIME') { gBody.material.color.setHex(0xd4af37); gCore.material.color.setHex(0xffffff); document.getElementById('wpn').innerText = "PRIME VANDAL"; }
             closePanels();
         };
+        window.buy = (s) => window.applySkin(s);
 
         window.toggleCheat = (t) => {
             cheats[t] = !cheats[t];
@@ -107,14 +132,9 @@
         function spawn() {
             const bot = new THREE.Group();
             const bBody = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, 0.4), new THREE.MeshStandardMaterial({color: 0xff4655}));
-            
-            // ESP KUTUSU
             const espGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.9, 1.7, 0.5));
-            const espMat = new THREE.LineBasicMaterial({color: 0x00ff00, depthTest: false, transparent: true, opacity: 0});
-            const espBox = new THREE.LineSegments(espGeo, espMat);
-            espBox.renderOrder = 999;
-            
-            bot.add(bBody, espBox);
+            const espBox = new THREE.LineSegments(espGeo, new THREE.LineBasicMaterial({color: 0x00ff00, depthTest: false}));
+            espBox.visible = false; bot.add(bBody, espBox);
             bot.position.set((Math.random()-0.5)*40, 0.8, -10 - Math.random()*20);
             scene.add(bot); enemies.push(bot);
         }
@@ -122,29 +142,23 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            sign.rotation.y += 0.01;
-            
-            if(document.pointerLockElement && gameStarted) {
+            if(gameStarted && document.pointerLockElement) {
                 const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
                 const r = new THREE.Vector3().crossVectors(f, camera.up).normalize();
                 if(keys['KeyW']) camera.position.add(f.multiplyScalar(0.15));
                 if(keys['KeyS']) camera.position.add(f.multiplyScalar(-0.15));
                 if(keys['KeyA']) camera.position.add(r.multiplyScalar(-0.15));
                 if(keys['KeyD']) camera.position.add(r.multiplyScalar(0.15));
-                camera.position.y = 1.6;
 
                 enemies.forEach(e => {
                     e.lookAt(camera.position.x, 0.8, camera.position.z);
                     e.translateZ(0.03);
-                    e.children[1].material.opacity = cheats.esp ? 1 : 0; // ESP KONTROL
-                    if(e.position.distanceTo(camera.position) < 2) hp -= 0.1;
+                    e.children[1].visible = cheats.esp;
                 });
 
                 if(cheats.aim && enemies.length > 0) {
                     camera.lookAt(enemies[0].position.x, 1.8, enemies[0].position.z);
                 }
-                document.getElementById('hp').innerText = Math.floor(hp);
-                if(hp <= 0) location.reload();
             }
             renderer.render(scene, camera);
         }
@@ -155,12 +169,12 @@
             const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(0,0), camera);
             const hits = ray.intersectObjects(enemies, true);
             if(hits.length > 0) {
-                let t = hits[0].object.parent;
-                scene.remove(t); enemies.splice(enemies.indexOf(t), 1); spawn();
+                let target = hits[0].object.parent;
+                scene.remove(target); enemies.splice(enemies.indexOf(target), 1); spawn();
                 kills++; document.getElementById('kl').innerText = kills;
                 if(kills % 5 === 0) {
                     document.getElementById('bela-overlay').style.display = 'block';
-                    setTimeout(() => document.getElementById('bela-overlay').style.display = 'none', 5000);
+                    setTimeout(() => document.getElementById('bela-overlay').style.display = 'none', 3000);
                 }
             }
         });
