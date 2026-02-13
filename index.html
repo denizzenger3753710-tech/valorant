@@ -2,13 +2,15 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Valorant JS - Pro Poligon</title>
+    <title>Valorant JS - Ascent & Neon</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #0b141a; font-family: 'Segoe UI', sans-serif; }
+        
         #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 10px; height: 10px;
+            position: absolute; top: 50%; left: 50%; width: 8px; height: 8px;
             border: 2px solid #00ffcc; transform: translate(-50%, -50%); pointer-events: none; z-index: 5;
         }
+        
         #hud { position: absolute; width: 100%; height: 100%; pointer-events: none; color: white; }
         .ammo-box { position: absolute; bottom: 40px; right: 60px; text-align: right; }
         .kill-count { position: absolute; top: 20px; right: 40px; font-size: 24px; color: #ff4655; font-weight: bold; }
@@ -24,29 +26,79 @@
             position: absolute; width: 100%; height: 100%; background: #0b141a;
             display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100;
         }
+
+        /* B Market Menüsü */
+        #b-market {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 70%; height: 80%; background: rgba(15, 25, 35, 0.95);
+            border: 2px solid #00ffcc; display: none; z-index: 90;
+            grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 30px;
+            pointer-events: auto; overflow-y: auto; color: white;
+        }
+        .weapon-card {
+            background: rgba(0,255,204,0.05); border: 1px solid #444; padding: 15px;
+            text-align: center; cursor: pointer; transition: 0.2s;
+        }
+        .weapon-card:hover { border-color: #ff4655; background: rgba(255,70,85,0.1); }
+        .weapon-card h3 { color: #00ffcc; margin-top: 0; }
+        .weapon-card p { font-size: 12px; color: #aaa; }
+
+        /* Neon Yetenek Barı */
+        #ability-bar {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px; background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 8px;
+            pointer-events: none;
+        }
+        .ability-slot {
+            width: 50px; height: 50px; background: rgba(0,255,204,0.1); border: 2px solid #00ffcc;
+            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px;
+            color: #00ffcc; position: relative;
+        }
+        .ability-cooldown {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+            font-size: 14px; color: white; opacity: 0; transition: opacity 0.2s;
+        }
+        .ability-active { border-color: #ff4655 !important; color: #ff4655 !important; box-shadow: 0 0 10px #ff4655; }
     </style>
 </head>
 <body>
 
     <div id="start-screen" onclick="startGame()">
-        <h1 style="letter-spacing: 5px; color: #ff4655;">POLİGON v1.2</h1>
-        <p>BAŞLAMAK İÇİN TIKLA</p>
+        <h1 style="letter-spacing: 5px; color: #ff4655;">ASCENT & NEON</h1>
+        <p>BAŞLAMAK İÇİN TIKLA KANKA</p>
     </div>
 
     <div id="settings">
         SENS: <input type="number" id="sensInput" step="0.1" value="1.0">
         <br>
         <button class="btn-small" onclick="changeCrosshair()">CROSS DEĞİŞTİR</button>
-        <div style="font-size: 10px; margin-top: 10px; color: #888;">B: Market | R: Reload | X: Ulti</div>
     </div>
 
-    <div id="crosshair" id="ch-box"></div>
+    <div id="b-market">
+        <h2 style="grid-column: span 4; text-align: center; color: #ff4655;">BUY MENU</h2>
+        <div class="weapon-card" onclick="buyWeapon('Classic', 12, {head: 78, body: 26, legs: 22})"><h3>CLASSIC</h3><p>Bedava</p></div>
+        <div class="weapon-card" onclick="buyWeapon('Sheriff', 6, {head: 159, body: 55, legs: 46})"><h3>SHERIFF</h3><p>800 Kredi</p></div>
+        <div class="weapon-card" onclick="buyWeapon('Spectre', 30, {head: 78, body: 26, legs: 22})"><h3>SPECTRE</h3><p>1600 Kredi</p></div>
+        <div class="weapon-card" onclick="buyWeapon('Phantom', 25, {head: 140, body: 35, legs: 30})"><h3>PHANTOM</h3><p>2900 Kredi</p></div>
+        <div class="weapon-card" onclick="buyWeapon('Vandal', 25, {head: 160, body: 40, legs: 34})"><h3>VANDAL</h3><p>2900 Kredi</p></div>
+        <div class="weapon-card" onclick="buyWeapon('Operator', 5, {head: 255, body: 150, legs: 120})"><h3>OPERATOR</h3><p>4700 Kredi</p></div>
+        <p style="grid-column: span 4; text-align: center; color: #777;">Kapatmak için 'B'ye bas</p>
+    </div>
+
+    <div id="crosshair"></div>
     
     <div id="hud">
         <div class="kill-count">KILLS: <span id="score">0</span></div>
         <div class="ammo-box">
-            <div style="color: #00ffcc; font-weight: bold;">PHANTOM</div>
+            <div id="current-weapon-name" style="color: #00ffcc; font-weight: bold;">PHANTOM</div>
             <h1 style="font-size: 60px; margin:0;"><span id="ammo-count">25</span></h1>
+        </div>
+        <div id="ability-bar">
+            <div class="ability-slot" id="ability-q">Q <div class="ability-cooldown" id="cd-q"></div></div>
+            <div class="ability-slot" id="ability-e">E <div class="ability-cooldown" id="cd-e"></div></div>
+            <div class="ability-slot" id="ability-c">C <div class="ability-cooldown" id="cd-c"></div></div>
+            <div class="ability-slot" id="ability-x">X <div class="ability-cooldown" id="cd-x"></div></div>
         </div>
     </div>
 
@@ -57,34 +109,42 @@
     <script type="module">
         import * as THREE from 'three';
 
-        let ammo = 25, score = 0;
+        // --- OYUN DEĞİŞKENLERİ ---
+        let ammo = 25, score = 0, health = 100;
         let sensitivity = 0.002;
+        let currentWeapon = {name: 'Phantom', head: 140, body: 35, legs: 30};
         const enemies = [];
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // --- HASSASİYET HAFIZA SİSTEMİ ---
+        // Neon Yetenek Değişkenleri
+        let isSprinting = false;
+        let qCooldown = 0, eCooldown = 0, cCooldown = 0, xCooldown = 0;
+        let qActive = false, eActive = false, cActive = false, xActive = false;
+        const NEON_SPEED_BOOST = 0.15;
+        const NEON_BASE_SPEED = 0.12;
+
+        // --- HASSASİYET HAFIZA & AYAR ---
         const sensInput = document.getElementById('sensInput');
         const savedSens = localStorage.getItem('valSens');
         if(savedSens) {
             sensInput.value = savedSens;
             sensitivity = 0.002 * parseFloat(savedSens);
         }
-
         sensInput.addEventListener('change', (e) => {
             let val = parseFloat(e.target.value);
             sensitivity = 0.002 * val;
-            localStorage.setItem('valSens', val); // Hafızaya al
+            localStorage.setItem('valSens', val);
         });
 
-        // --- CROSSHAIR DEĞİŞTİRME ---
-        let colors = ['#00ffcc', '#ff0000', '#ffffff', '#ffff00'];
-        let colorIdx = 0;
+        // --- CROSSHAIR ---
+        let crosshairColors = ['#00ffcc', '#ff0000', '#ffffff', '#ffff00'];
+        let crosshairColorIdx = 0;
         window.changeCrosshair = () => {
-            colorIdx = (colorIdx + 1) % colors.length;
-            document.getElementById('crosshair').style.borderColor = colors[colorIdx];
+            crosshairColorIdx = (crosshairColorIdx + 1) % crosshairColors.length;
+            document.getElementById('crosshair').style.borderColor = crosshairColors[crosshairColorIdx];
         };
 
-        // --- SES ---
+        // --- SESLER ---
         function playShootSound() {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
@@ -97,28 +157,48 @@
             osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }
 
-        // --- SAHNE KURULUMU ---
+        // --- SAHNE KURULUMU (ASCENT TEMASI) ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a1f24);
+        scene.background = new THREE.Color(0x384a5c); // Gri-mavi gökyüzü
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.GridHelper(100, 40, 0x333333, 0x222222));
+        // Zemin
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({color: 0x888888}));
+        floor.rotation.x = -Math.PI/2;
+        scene.add(floor);
+        scene.add(new THREE.GridHelper(100, 40, 0x555555, 0x444444));
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
-        // --- BOT SPAWN ---
-        function spawnBot() {
-            const bot = new THREE.Mesh(
-                new THREE.BoxGeometry(1, 2, 0.5),
-                new THREE.MeshPhongMaterial({ color: 0x00ffcc })
-            );
-            bot.position.set((Math.random()-0.5)*25, 1, -Math.random()*20 - 5);
-            scene.add(bot);
-            enemies.push(bot);
+        // Ascent Yapıları (Basit Kutular)
+        const wallMaterial = new THREE.MeshPhongMaterial({color: 0xcccccc});
+        function createBoxWall(w, h, d, x, y, z) {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMaterial);
+            wall.position.set(x, y + h/2, z);
+            scene.add(wall);
         }
-        for(let i=0; i<5; i++) spawnBot();
+        createBoxWall(20, 5, 1, 0, 0, -15); // Arka duvar
+        createBoxWall(1, 5, 30, -10, 0, 0); // Sol duvar
+        createBoxWall(1, 5, 30, 10, 0, 0);  // Sağ duvar
+        createBoxWall(8, 3, 3, 0, 0, -5);   // Orta kutu
+
+        // --- BOT SPAWN ---
+        class Bot extends THREE.Group {
+            constructor() {
+                super();
+                this.health = 100;
+                this.body = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 0.5), new THREE.MeshPhongMaterial({ color: 0x00ffcc }));
+                this.head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshPhongMaterial({ color: 0xff4655 }));
+                this.head.position.y = 1;
+                this.add(this.body, this.head);
+                this.position.set((Math.random()-0.5)*25, 1.25, -Math.random()*20 - 5);
+                scene.add(this);
+                enemies.push(this);
+            }
+        }
+        for(let i=0; i<5; i++) new Bot();
 
         // --- SİLAH ---
         const gun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.7), new THREE.MeshPhongMaterial({color: 0x111111}));
@@ -132,6 +212,20 @@
             document.body.requestPointerLock();
         };
 
+        let keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if(e.code === 'KeyR') { ammo = 25; document.getElementById('ammo-count').innerText = ammo; }
+            if(e.code === 'KeyB') toggleMarket();
+            
+            // Neon Yetenekleri Tuşları
+            if(e.code === 'KeyE' && eCooldown === 0) activateE();
+            if(e.code === 'KeyQ' && qCooldown === 0) activateQ();
+            if(e.code === 'KeyC' && cCooldown === 0) activateC();
+            if(e.code === 'KeyX' && xCooldown === 0) activateX();
+        });
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
+
         document.addEventListener('mousemove', (e) => {
             if (document.pointerLockElement) {
                 camera.rotation.y -= e.movementX * sensitivity;
@@ -141,27 +235,123 @@
             }
         });
 
+        // --- B MARKET ---
+        let isMarketOpen = false;
+        function toggleMarket() {
+            isMarketOpen = !isMarketOpen;
+            document.getElementById('b-market').style.display = isMarketOpen ? 'grid' : 'none';
+            if (isMarketOpen) document.exitPointerLock();
+            else document.body.requestPointerLock();
+        }
+
+        window.buyWeapon = (name, count, damage) => {
+            currentWeapon = {name, ...damage};
+            ammo = count;
+            document.getElementById('current-weapon-name').innerText = name.toUpperCase();
+            document.getElementById('ammo-count').innerText = ammo;
+            toggleMarket();
+        };
+
+        // --- ATEŞ ETME & HASAR SİSTEMİ ---
         document.addEventListener('mousedown', () => {
-            if (document.pointerLockElement && ammo > 0) {
+            if (document.pointerLockElement && ammo > 0 && !isMarketOpen) {
                 ammo--;
                 document.getElementById('ammo-count').innerText = ammo;
                 playShootSound();
 
                 const ray = new THREE.Raycaster();
                 ray.setFromCamera(new THREE.Vector2(0,0), camera);
-                const hits = ray.intersectObjects(enemies);
-                if (hits.length > 0) {
-                    score++;
-                    document.getElementById('score').innerText = score;
-                    hits[0].object.position.set((Math.random()-0.5)*25, 1, -Math.random()*20 - 5);
+                const intersects = ray.intersectObjects(enemies, true);
+
+                if (intersects.length > 0) {
+                    const hitObject = intersects[0].object;
+                    const bot = hitObject.parent; // Bot'u bul
+                    let damage = 0;
+
+                    if (hitObject === bot.head) damage = currentWeapon.head;
+                    else if (hitObject === bot.body) damage = currentWeapon.body;
+                    else damage = currentWeapon.legs;
+
+                    bot.health -= damage;
+                    console.log(`Bot hasarı: ${damage}, Kalan Can: ${bot.health}`);
+
+                    if (bot.health <= 0) {
+                        score++;
+                        document.getElementById('score').innerText = score;
+                        scene.remove(bot);
+                        enemies.splice(enemies.indexOf(bot), 1);
+                        new Bot(); // Yeni bot spawn et
+                    }
                 }
             }
         });
 
+        // --- NEON YETENEKLERİ ---
+        function activateE() { // Hızlanma
+            isSprinting = true;
+            eCooldown = 5; // 5 saniye cooldown
+            document.getElementById('ability-e').classList.add('ability-active');
+            updateCooldownDisplay('e');
+            setTimeout(() => {
+                isSprinting = false;
+                document.getElementById('ability-e').classList.remove('ability-active');
+            }, 3000); // 3 saniye aktif kalır
+        }
+
+        function activateQ() { // Elektrik Topu
+            console.log("Q Yeteneği: Elektrik Topu atıldı!");
+            qCooldown = 10;
+            updateCooldownDisplay('q');
+        }
+
+        function activateC() { // Elektrik Duvarı
+            console.log("C Yeteneği: Elektrik Duvarı kuruldu!");
+            cCooldown = 15;
+            updateCooldownDisplay('c');
+        }
+        
+        function activateX() { // Ulti
+            console.log("X Yeteneği: Ulti Aktif!");
+            xCooldown = 30;
+            updateCooldownDisplay('x');
+        }
+
+        function updateCooldownDisplay(skill) {
+            const cdElement = document.getElementById(`cd-${skill}`);
+            let currentCd;
+            switch(skill) {
+                case 'q': currentCd = qCooldown; break;
+                case 'e': currentCd = eCooldown; break;
+                case 'c': currentCd = cCooldown; break;
+                case 'x': currentCd = xCooldown; break;
+            }
+
+            if (currentCd > 0) {
+                cdElement.style.opacity = 1;
+                cdElement.innerText = currentCd;
+                const interval = setInterval(() => {
+                    currentCd--;
+                    cdElement.innerText = currentCd;
+                    if (currentCd <= 0) {
+                        clearInterval(interval);
+                        cdElement.style.opacity = 0;
+                        switch(skill) {
+                            case 'q': qCooldown = 0; break;
+                            case 'e': eCooldown = 0; break;
+                            case 'c': cCooldown = 0; break;
+                            case 'x': xCooldown = 0; break;
+                        }
+                    }
+                }, 1000);
+            }
+        }
+
+        // --- OYUN DÖNGÜSÜ ---
         function animate() {
             requestAnimationFrame(animate);
-            if (document.pointerLockElement) {
-                const speed = 0.12;
+            if (document.pointerLockElement && !isMarketOpen) {
+                const speed = isSprinting ? NEON_BASE_SPEED + NEON_SPEED_BOOST : NEON_BASE_SPEED;
+
                 if (keys['KeyW']) camera.translateZ(-speed);
                 if (keys['KeyS']) camera.translateZ(speed);
                 if (keys['KeyA']) camera.translateX(-speed);
@@ -170,15 +360,6 @@
             }
             renderer.render(scene, camera);
         }
-
-        let keys = {};
-        document.addEventListener('keydown', (e) => {
-            keys[e.code] = true;
-            if(e.code === 'KeyR') { ammo = 25; document.getElementById('ammo-count').innerText = ammo; }
-            if(e.code === 'KeyB') console.log("Market Açıldı");
-        });
-        document.addEventListener('keyup', (e) => keys[e.code] = false);
-
         animate();
     </script>
 </body>
