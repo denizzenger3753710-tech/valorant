@@ -2,46 +2,47 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Valorant JS - Ascent/Neon</title>
+    <title>Valorant JS - Agent Hunt</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #050a14; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #050a14; font-family: 'Segoe UI', sans-serif; cursor: crosshair; }
         #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
             background: #00ffcc; outline: 1px solid rgba(0,0,0,0.5);
-            transform: translate(-50%, -50%); pointer-events: none;
+            transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%;
         }
         #hud { position: absolute; width: 100%; height: 100%; pointer-events: none; color: white; }
         .hp-box { position: absolute; bottom: 40px; left: 60px; border-left: 5px solid #00ffcc; padding-left: 15px; }
         .ammo-box { position: absolute; bottom: 40px; right: 60px; text-align: right; border-right: 5px solid #ff4655; padding-right: 15px; }
-        .neon-energy { width: 200px; height: 10px; background: rgba(255,255,255,0.2); position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); }
-        #energy-bar { width: 100%; height: 100%; background: #00ffcc; }
-        #settings { position: absolute; top: 20px; left: 20px; pointer-events: auto; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; color: white; }
+        #settings { position: absolute; top: 20px; left: 20px; pointer-events: auto; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; color: white; border: 1px solid #00ffcc; }
         #start-screen {
-            position: absolute; width: 100%; height: 100%; background: rgba(5,10,20,0.8);
-            display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 10; cursor: pointer;
+            position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, #0f1923 0%, #050a14 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 10;
         }
+        .neon-btn { padding: 15px 40px; background: #ff4655; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px; transition: 0.3s; }
+        .neon-btn:hover { background: #00ffcc; color: #050a14; box-shadow: 0 0 20px #00ffcc; }
     </style>
 </head>
 <body onclick="document.body.requestPointerLock()">
 
     <div id="start-screen">
-        <h1 style="color: #00ffcc;">ASCENT'E HOŞGELDİN</h1>
-        <p>DEVAM ETMEK İÇİN TIKLA KANKA</p>
+        <h1 style="color: #ff4655; font-size: 60px; margin-bottom: 10px;">AGENT HUNT</h1>
+        <p style="margin-bottom: 30px; letter-spacing: 2px;">JETT, SOVA, VIPER VE CYPHER'A KARŞI</p>
+        <button class="neon-btn">SAVAŞA KATIL</button>
     </div>
 
     <div id="settings">
-        Hassasiyet: <input type="range" id="sens" min="0.0005" max="0.01" step="0.0005" value="0.002">
+        Hassasiyet: <br>
+        <input type="range" id="sens" min="0.0005" max="0.01" step="0.0005" value="0.002">
     </div>
 
     <div id="crosshair"></div>
     
     <div id="hud">
-        <div class="neon-energy"><div id="energy-bar"></div></div>
         <div class="hp-box"><div>SAĞLIK</div><div style="font-size: 40px; font-weight: bold;">100</div></div>
         <div class="ammo-box">
             <div>PHANTOM</div>
             <div style="font-size: 40px; font-weight: bold;"><span id="ammo-count">25</span> / 75</div>
-            <div id="reload-msg" style="color: yellow; display: none;">R - RELOAD</div>
+            <div id="reload-msg" style="color: #ff4655; display: none; font-weight: bold;">R - ŞARJÖR DEĞİŞTİR!</div>
         </div>
     </div>
 
@@ -52,101 +53,110 @@
     <script type="module">
         import * as THREE from 'three';
 
-        let ammo = 25, energy = 100, isSprinting = false;
+        let ammo = 25, isReloading = false;
         let sensitivity = 0.002;
         const enemies = [];
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const agentImages = ['jett.jpg', 'cypher.jpg', 'sova.jpg', 'viper.jpg'];
 
         document.getElementById('sens').addEventListener('input', (e) => sensitivity = parseFloat(e.target.value));
 
-        // --- SAHNE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Gökyüzü (Ascent havası)
+        scene.background = new THREE.Color(0x87ceeb); // Ascent gökyüzü
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- ASCENT HARİTASI (Basit Duvarlar) ---
-        const wallMat = new THREE.MeshPhongMaterial({ color: 0xcccccc });
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({color: 0x888888}));
+        // --- ASCENT HARİTASI ---
+        const textureLoader = new THREE.TextureLoader();
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({color: 0x5a676d}));
         floor.rotation.x = -Math.PI/2;
         scene.add(floor);
 
+        const wallMat = new THREE.MeshPhongMaterial({ color: 0xe2dcd3 });
         function createWall(w, h, d, x, z) {
             const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
             wall.position.set(x, h/2, z);
             scene.add(wall);
         }
-        createWall(20, 10, 1, 0, -15); // Arka duvar
-        createWall(1, 10, 30, -10, 0); // Sol duvar
-        createWall(1, 10, 30, 10, 0);  // Sağ duvar
+        createWall(40, 8, 1, 0, -20); // Arka duvar
+        createWall(1, 8, 40, -20, 0); // Sol
+        createWall(1, 8, 40, 20, 0);  // Sağ
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.5);
-        sun.position.set(5, 10, 5);
-        scene.add(sun);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 
-        // --- SAGE BOTU ---
-        function createSage() {
-            const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.8, 0.4), new THREE.MeshPhongMaterial({ color: 0x008080 }));
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshPhongMaterial({ color: 0xffdbac }));
-            head.position.y = 1.1;
-            group.add(body, head);
-            group.position.set((Math.random()-0.5)*15, 0.9, -10);
-            scene.add(group);
-            enemies.push(group);
+        // --- RASTGELE AGENT SPAWN SİSTEMİ ---
+        function spawnAgent() {
+            const randomImg = agentImages[Math.floor(Math.random() * agentImages.length)];
+            const map = textureLoader.load(randomImg);
+            const material = new THREE.SpriteMaterial({ map: map });
+            const sprite = new THREE.Sprite(material);
+            
+            // Boyut ayarı (Karakter dik dursun)
+            sprite.scale.set(2.5, 4, 1); 
+            
+            // Rastgele konum
+            sprite.position.set(
+                (Math.random() - 0.5) * 30,
+                2,
+                -Math.random() * 15 - 5
+            );
+            
+            scene.add(sprite);
+            enemies.push(sprite);
         }
-        for(let i=0; i<5; i++) createSage();
+
+        for(let i=0; i<6; i++) spawnAgent();
 
         // --- SİLAH ---
-        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.7), new THREE.MeshPhongMaterial({ color: 0x222222 }));
-        gun.position.set(0.35, -0.3, -0.6);
+        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.7), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+        gun.position.set(0.3, -0.25, -0.5);
         camera.add(gun);
         scene.add(camera);
 
-        // --- KONTROLLER ---
+        // --- KONTROLLER VE MOUSE ---
         let keys = {};
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-            if(e.code === 'KeyR' && ammo < 25) reload();
-            if(e.code === 'KeyE') isSprinting = !isSprinting;
-            if(e.code === 'KeyQ') console.log("Neon Bolt Atıldı!");
-            if(e.code === 'KeyC') console.log("Neon Duvar Açıldı!");
+            if(e.code === 'KeyR' && ammo < 25 && !isReloading) reload();
         });
         document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // MOUSE DÜZELTİLDİ: movementY artık doğru bakıyor
         document.addEventListener('mousemove', (e) => {
             if (document.pointerLockElement) {
                 camera.rotation.y -= e.movementX * sensitivity;
-                let newX = camera.rotation.x - e.movementY * sensitivity; // Yön düzeltildi
+                let newX = camera.rotation.x - e.movementY * sensitivity; // DÜZELTİLDİ: Terslik yok
                 camera.rotation.x = Math.max(-1.4, Math.min(1.4, newX));
             }
         });
 
         function reload() {
+            isReloading = true;
             document.getElementById('reload-msg').innerText = "YÜKLENİYOR...";
             setTimeout(() => {
                 ammo = 25;
+                isReloading = false;
                 document.getElementById('ammo-count').innerText = ammo;
                 document.getElementById('reload-msg').style.display = 'none';
             }, 1500);
         }
 
         document.addEventListener('mousedown', () => {
-            if (document.pointerLockElement && ammo > 0) {
+            if (document.pointerLockElement && ammo > 0 && !isReloading) {
                 ammo--;
                 document.getElementById('ammo-count').innerText = ammo;
                 if(ammo <= 0) document.getElementById('reload-msg').style.display = 'block';
-                
-                // Mermi İzi ve Hit Check
+
+                // Hit Check
                 const ray = new THREE.Raycaster();
                 ray.setFromCamera(new THREE.Vector2(0,0), camera);
-                const hits = ray.intersectObjects(enemies, true);
+                const hits = ray.intersectObjects(enemies);
+                
                 if(hits.length > 0) {
-                    hits[0].object.parent.position.set((Math.random()-0.5)*15, 0.9, -10);
+                    const hitAgent = hits[0].object;
+                    scene.remove(hitAgent);
+                    enemies.splice(enemies.indexOf(hitAgent), 1);
+                    setTimeout(spawnAgent, 1000); // 1 saniye sonra yeni ajan gelsin
                 }
             }
         });
@@ -155,10 +165,8 @@
             requestAnimationFrame(animate);
             if (document.pointerLockElement) {
                 document.getElementById('start-screen').style.display = 'none';
-                let speed = (isSprinting && energy > 0) ? 0.3 : 0.12;
-                if (isSprinting && energy > 0) energy -= 0.5; else if(energy < 100) energy += 0.2;
-                document.getElementById('energy-bar').style.width = energy + '%';
-
+                const speed = keys['ShiftLeft'] ? 0.25 : 0.12;
+                
                 if (keys['KeyW']) camera.translateZ(-speed);
                 if (keys['KeyS']) camera.translateZ(speed);
                 if (keys['KeyA']) camera.translateX(-speed);
