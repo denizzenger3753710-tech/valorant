@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Valorant JS - Pro</title>
+    <title>Valorant JS - Pro Market</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #050a14; font-family: 'Segoe UI', sans-serif; }
         #crosshair {
@@ -10,39 +10,48 @@
             border: 2px solid #00ffcc; transform: translate(-50%, -50%); pointer-events: none;
         }
         #hud { position: absolute; width: 100%; height: 100%; pointer-events: none; color: white; }
-        .ammo-box { position: absolute; bottom: 40px; right: 60px; text-align: right; }
+        .ammo-box { position: absolute; bottom: 40px; right: 60px; text-align: right; border-right: 5px solid #ff4655; padding-right: 15px; }
         
-        /* Market Menüsü */
+        /* Gelişmiş B Menüsü */
         #market {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(15, 25, 35, 0.95); padding: 30px; border: 2px solid #ff4655;
-            display: none; color: white; text-align: center; pointer-events: auto;
+            width: 80%; height: 70%; background: rgba(15, 25, 35, 0.98);
+            border: 2px solid #ff4655; display: none; color: white; padding: 20px;
+            grid-template-columns: repeat(3, 1fr); gap: 20px; pointer-events: auto;
         }
-        .weapon-btn { padding: 10px 20px; background: #00ffcc; border: none; margin: 10px; cursor: pointer; font-weight: bold; }
+        .weapon-card {
+            background: rgba(255,255,255,0.05); border: 1px solid #444;
+            padding: 15px; cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .weapon-card:hover { border-color: #00ffcc; background: rgba(0,255,204,0.1); }
+        .weapon-card h3 { color: #ff4655; margin: 5px 0; }
 
-        #settings { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.5); padding: 10px; color: white; pointer-events: auto; }
+        #settings { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 10px; pointer-events: auto; }
     </style>
 </head>
-<body>
+<body onclick="if(!isMarketOpen) document.body.requestPointerLock()">
 
     <div id="settings">
-        SENS: <input type="range" id="sensRange" min="0.1" max="5.0" step="0.1" value="1.0">
-        <br><small>F11: Tam Ekran | B: Market</small>
+        Hassasiyet: <input type="range" id="sens" min="0.1" max="5.0" step="0.1" value="1.0">
+        <br><small>B: Market | R: Reload | X, C, Q: Yetenek</small>
     </div>
 
     <div id="market">
-        <h1>SATIN ALMA EVRESİ</h1>
-        <button class="weapon-btn" onclick="buyWeapon('Vandal', 25)">VANDAL (25 Mermi)</button>
-        <button class="weapon-btn" onclick="buyWeapon('Sheriff', 6)">SHERIFF (6 Mermi)</button>
-        <p>Kapatmak için 'B'ye tekrar bas</p>
+        <div class="weapon-card" onclick="buy('Classic', 12)"><h3>CLASSIC</h3><p>Beylik Silah</p></div>
+        <div class="weapon-card" onclick="buy('Sheriff', 6)"><h3>SHERIFF</h3><p>800 Kredi</p></div>
+        <div class="weapon-card" onclick="buy('Spectre', 30)"><h3>SPECTRE</h3><p>1600 Kredi</p></div>
+        <div class="weapon-card" onclick="buy('Vandal', 25)"><h3>VANDAL</h3><p>2900 Kredi</p></div>
+        <div class="weapon-card" onclick="buy('Phantom', 25)"><h3>PHANTOM</h3><p>2900 Kredi</p></div>
+        <div class="weapon-card" onclick="buy('Operator', 5)"><h3>OPERATOR</h3><p>4700 Kredi</p></div>
+        <p style="grid-column: span 3; color: #777;">Kapatmak için 'B'ye bas kanka</p>
     </div>
 
     <div id="crosshair"></div>
     
     <div id="hud">
         <div class="ammo-box">
-            <h2 id="gun-name">VANDAL</h2>
-            <h1 style="font-size: 50px;"><span id="ammo-count">25</span></h1>
+            <div id="cur-weapon" style="color: #00ffcc; font-weight: bold; letter-spacing: 2px;">VANDAL</div>
+            <div style="font-size: 50px; font-weight: bold;"><span id="ammo-count">25</span></div>
         </div>
     </div>
 
@@ -53,65 +62,64 @@
     <script type="module">
         import * as THREE from 'three';
 
-        let ammo = 25, maxAmmo = 25, sensMultiplier = 0.002;
-        let isMarketOpen = false;
+        let ammo = 25, maxAmmo = 25, isMarketOpen = false;
+        let sensitivity = 0.002;
         const enemies = [];
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // --- SES SİSTEMİ (RESTORASYON) ---
-        function playShootSound() {
+        // --- SES ÜRETİCİ ---
+        function playGunSound(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.type = type === 'Heavy' ? 'sawtooth' : 'square';
+            osc.frequency.setValueAtTime(type === 'Heavy' ? 100 : 180, audioCtx.currentTime);
             gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }
 
-        // --- SAHNE ---
+        // --- ÜÇ BOYUTLU DÜNYA ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);
+        scene.background = new THREE.Color(0x101823);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.GridHelper(100, 50, 0x444444, 0x222222));
+        scene.add(new THREE.GridHelper(100, 40, 0xff4655, 0x222222));
         scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-        // --- DÜŞMAN SPAWN (Görsel Kontrollü) ---
-        const agentFiles = ['jett.jpg', 'cypher.jpg', 'sova.jpg', 'viper.jpg'];
-        const textureLoader = new THREE.TextureLoader();
+        // --- AJANLAR (Görsellerini attığın kadro) ---
+        const agents = ['jett.jpg', 'cypher.jpg', 'sova.jpg', 'viper.jpg'];
+        const loader = new THREE.TextureLoader();
 
-        function spawnEnemy() {
-            const file = agentFiles[Math.floor(Math.random() * agentFiles.length)];
-            // Resim yüklenemezse hata vermemesi için koruma
-            textureLoader.load(file, (texture) => {
-                const mat = new THREE.SpriteMaterial({ map: texture });
-                const s = new THREE.Sprite(mat);
-                setupEnemy(s);
+        function spawnAgent() {
+            const agentFile = agents[Math.floor(Math.random() * agents.length)];
+            loader.load(agentFile, (tex) => {
+                const mat = new THREE.SpriteMaterial({ map: tex });
+                const sprite = new THREE.Sprite(mat);
+                sprite.scale.set(2, 3.5, 1);
+                sprite.position.set((Math.random()-0.5)*30, 1.75, -Math.random()*20 - 5);
+                scene.add(sprite);
+                enemies.push(sprite);
             }, undefined, () => {
-                // HATA DURUMUNDA SAGE YEŞİLİ KUTU
-                const s = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshPhongMaterial({color: 0x00ffcc}));
-                setupEnemy(s);
+                // Resim yoksa Sage Yeşili Blok
+                const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshPhongMaterial({color: 0x00ffcc}));
+                cube.position.set((Math.random()-0.5)*30, 1, -Math.random()*20 - 5);
+                scene.add(cube);
+                enemies.push(cube);
             });
         }
+        for(let i=0; i<6; i++) spawnAgent();
 
-        function setupEnemy(obj) {
-            obj.position.set((Math.random()-0.5)*30, 1, -Math.random()*20 - 5);
-            obj.scale.set(2, 3, 1);
-            scene.add(obj);
-            enemies.push(obj);
-        }
-        for(let i=0; i<5; i++) spawnEnemy();
-
-        // --- SİLAH ---
-        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.6), new THREE.MeshPhongMaterial({color: 0x111111}));
-        gun.position.set(0.3, -0.2, -0.5);
-        camera.add(gun);
+        // --- SİLAH VE EL TUTUŞU ---
+        const gunGroup = new THREE.Group();
+        const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.7), new THREE.MeshPhongMaterial({color: 0x111111}));
+        gunGroup.add(gunBody);
+        gunGroup.position.set(0.35, -0.3, -0.6);
+        camera.add(gunGroup);
         scene.add(camera);
 
         // --- KONTROLLER ---
@@ -119,61 +127,58 @@
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
             if(e.code === 'KeyB') toggleMarket();
-            if(e.code === 'F11') toggleFullScreen();
-            if(e.code === 'KeyR') ammo = maxAmmo; document.getElementById('ammo-count').innerText = ammo;
+            if(e.code === 'KeyR') reload();
         });
         document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // HASSASİYET AYARI
-        document.getElementById('sensRange').addEventListener('input', (e) => {
-            sensMultiplier = 0.002 * parseFloat(e.target.value);
-        });
+        document.getElementById('sens').addEventListener('input', (e) => sensitivity = 0.002 * e.target.value);
 
-        // MOUSE SİSTEMİ (Terslik Giderildi)
-        document.addEventListener('mousemove', (e) => {
-            if (document.pointerLockElement && !isMarketOpen) {
-                camera.rotation.y -= e.movementX * sensMultiplier;
-                let newX = camera.rotation.x - e.movementY * sensMultiplier;
-                camera.rotation.x = Math.max(-1.5, Math.min(1.5, newX));
-            }
-        });
-
-        // MARKET FONKSİYONLARI
         function toggleMarket() {
             isMarketOpen = !isMarketOpen;
-            document.getElementById('market').style.display = isMarketOpen ? 'block' : 'none';
-            if (isMarketOpen) document.exitPointerLock();
+            document.getElementById('market').style.display = isMarketOpen ? 'grid' : 'none';
+            if(isMarketOpen) document.exitPointerLock();
             else document.body.requestPointerLock();
         }
 
-        window.buyWeapon = (name, count) => {
-            ammo = count;
-            maxAmmo = count;
-            document.getElementById('gun-name').innerText = name;
+        window.buy = (name, count) => {
+            ammo = count; maxAmmo = count;
+            document.getElementById('cur-weapon').innerText = name;
             document.getElementById('ammo-count').innerText = ammo;
             toggleMarket();
         };
 
-        function toggleFullScreen() {
-            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-            else document.exitFullscreen();
+        function reload() {
+            ammo = maxAmmo;
+            document.getElementById('ammo-count').innerText = ammo;
         }
+
+        // MOUSE (TERS DEĞİL KANKA)
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement && !isMarketOpen) {
+                camera.rotation.y -= e.movementX * sensitivity;
+                let newX = camera.rotation.x - e.movementY * sensitivity;
+                camera.rotation.x = Math.max(-1.5, Math.min(1.5, newX));
+            }
+        });
 
         // ATEŞ ETME
         document.addEventListener('mousedown', () => {
             if (document.pointerLockElement && ammo > 0 && !isMarketOpen) {
                 ammo--;
                 document.getElementById('ammo-count').innerText = ammo;
-                playShootSound();
+                playGunSound(ammo < 10 ? 'Heavy' : 'Light');
                 
+                // Tepme Efekti
+                gunGroup.position.z += 0.05;
+
                 const ray = new THREE.Raycaster();
                 ray.setFromCamera(new THREE.Vector2(0,0), camera);
-                const hits = ray.intersectObjects(enemies, true);
-                if (hits.length > 0) {
+                const hits = ray.intersectObjects(enemies);
+                if(hits.length > 0) {
                     const hit = hits[0].object;
                     scene.remove(hit);
                     enemies.splice(enemies.indexOf(hit), 1);
-                    setTimeout(spawnEnemy, 1000);
+                    setTimeout(spawnAgent, 1000);
                 }
             }
         });
@@ -181,12 +186,14 @@
         function animate() {
             requestAnimationFrame(animate);
             if (document.pointerLockElement && !isMarketOpen) {
-                const speed = 0.12;
+                const speed = keys['ShiftLeft'] ? 0.25 : 0.12;
                 if (keys['KeyW']) camera.translateZ(-speed);
                 if (keys['KeyS']) camera.translateZ(speed);
                 if (keys['KeyA']) camera.translateX(-speed);
                 if (keys['KeyD']) camera.translateX(speed);
                 camera.position.y = 1.6;
+                // Silahı geri çekme animasyonu
+                gunGroup.position.z += (-0.6 - gunGroup.position.z) * 0.1;
             }
             renderer.render(scene, camera);
         }
