@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Valorant JS Clone - Dev Mode</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Arial', sans-serif; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 10px; height: 10px; border: 2px solid #00ff00;
+            transform: translate(-50%, -50%); pointer-events: none;
+        }
+        #ui {
+            position: absolute; bottom: 20px; left: 20px; color: white;
+            text-shadow: 2px 2px #000;
+        }
+        #instructions {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; text-align: center; background: rgba(0,0,0,0.7); padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="crosshair"></div>
+    <div id="ui">
+        <h2>HP: 100 | AMMO: 25</h2>
+        <p>Yetenekler: [Q] [E] [C] [X]</p>
+    </div>
+    <div id="instructions" onclick="this.style.display='none'; document.body.requestPointerLock();">
+        <h1>VALORANT JS</h1>
+        <p>Başlamak için tıkla</p>
+        <p>(WASD: Hareket | Mouse: Bakış & Ateş)</p>
+    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // 1. SAHNE VE KAMERA KURULUMU
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Gökyüzü mavisi
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. IŞIKLANDIRMA
+        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+        scene.add(light);
+
+        // 3. ZEMİN VE BASİT HARİTA
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        // Engel (Kutu) ekleyelim
+        const boxGeo = new THREE.BoxGeometry(2, 4, 2);
+        const boxMat = new THREE.MeshPhongMaterial({ color: 0xff4444 });
+        const target = new THREE.Mesh(boxGeo, boxMat);
+        target.position.set(0, 2, -10);
+        scene.add(target);
+
+        // 4. KONTROLLER
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        document.addEventListener('keydown', (e) => {
+            if(e.code === 'KeyW') moveForward = true;
+            if(e.code === 'KeyS') moveBackward = true;
+            if(e.code === 'KeyA') moveLeft = true;
+            if(e.code === 'KeyD') moveRight = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            if(e.code === 'KeyW') moveForward = false;
+            if(e.code === 'KeyS') moveBackward = false;
+            if(e.code === 'KeyA') moveLeft = false;
+            if(e.code === 'KeyD') moveRight = false;
+        });
+
+        // Mouse Hareketleri
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === document.body) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+            }
+        });
+
+        // Ateş Etme
+        document.addEventListener('mousedown', () => {
+            if (document.pointerLockElement === document.body) {
+                // Buraya ateş efekti gelecek
+                console.log("Ateş edildi!");
+            }
+        });
+
+        camera.position.y = 1.6; // İnsan boyu
+
+        // 5. OYUN DÖNGÜSÜ (ANIMATION LOOP)
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (document.pointerLockElement === document.body) {
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 0.01;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 0.01;
+
+                camera.translateX(-velocity.x);
+                camera.translateZ(-velocity.z);
+                
+                velocity.multiplyScalar(0.9); // Sürtünme
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Ekran boyutu değişirse güncelle
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
