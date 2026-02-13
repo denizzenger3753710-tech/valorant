@@ -2,42 +2,74 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Valorant JS - Versiyon 0.2</title>
+    <title>Valorant JS Projesi</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #101823; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Valorant Tarzı Crosshair */
         #crosshair {
             position: absolute; top: 50%; left: 50%;
-            width: 12px; height: 12px; border: 2px solid #00ff00;
+            width: 4px; height: 4px; background: #00ff00;
+            outline: 1px solid rgba(0,0,0,0.5);
             transform: translate(-50%, -50%); pointer-events: none;
-            border-radius: 50%;
         }
-        #ui {
-            position: absolute; bottom: 30px; left: 30px; color: white;
-            text-shadow: 2px 2px #000; letter-spacing: 2px;
+
+        /* Modern Arayüz (HUD) */
+        #hud {
+            position: absolute; width: 100%; height: 100%;
+            pointer-events: none; color: white;
         }
-        #instructions {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; text-align: center; background: rgba(0,0,0,0.85); 
-            padding: 30px; border: 2px solid #ff4655; cursor: pointer;
+        .ammo-box {
+            position: absolute; bottom: 40px; right: 60px;
+            text-align: right; border-right: 5px solid #ff4655; padding-right: 15px;
         }
-        .flash {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: white; opacity: 0; pointer-events: none;
+        .hp-box {
+            position: absolute; bottom: 40px; left: 60px;
+            border-left: 5px solid #00ffcc; padding-left: 15px;
+        }
+        .abilities {
+            position: absolute; bottom: 40px; left: 50%;
+            transform: translateX(-50%); display: flex; gap: 10px;
+        }
+        .ability {
+            width: 50px; height: 50px; border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+        }
+
+        #start-screen {
+            position: absolute; width: 100%; height: 100%;
+            background: rgba(15, 25, 35, 0.9); display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            color: white; z-index: 10; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
-    <div id="crosshair"></div>
-    <div id="flash-effect" class="flash"></div>
-    <div id="ui">
-        <h1 id="ammo">AMMO: 25 / ∞</h1>
-        <p style="color: #ff4655; font-weight: bold;">[SOL TIK] ATEŞ ET | [WASD] HAREKET</p>
+    <div id="start-screen" onclick="startGame()">
+        <h1 style="color: #ff4655; font-size: 50px;">BAŞLAT</h1>
+        <p>SESLERİ AKTİF ETMEK İÇİN TIKLA</p>
     </div>
-    <div id="instructions" onclick="this.style.display='none'; document.body.requestPointerLock();">
-        <h1 style="color: #ff4655;">VALORANT JS CLONE</h1>
-        <p>Hata Düzeltildi & Silah Eklendi</p>
-        <p>Başlamak için Tıkla</p>
+
+    <div id="crosshair"></div>
+    
+    <div id="hud">
+        <div class="hp-box">
+            <div style="font-size: 12px; opacity: 0.7;">SAĞLIK</div>
+            <div style="font-size: 40px; font-weight: bold;">100</div>
+        </div>
+        
+        <div class="abilities">
+            <div class="ability">C</div>
+            <div class="ability">Q</div>
+            <div class="ability" style="border-color: #ff4655;">E</div>
+            <div class="ability">X</div>
+        </div>
+
+        <div class="ammo-box">
+            <div style="font-size: 12px; opacity: 0.7;">PHANTOM</div>
+            <div style="font-size: 40px; font-weight: bold;"><span id="ammo-count">25</span> / 75</div>
+        </div>
     </div>
 
     <script type="importmap">
@@ -47,81 +79,104 @@
     <script type="module">
         import * as THREE from 'three';
 
+        let ammo = 25;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // --- SES ÜRETİCİ (Dosya gerektirmeden ateş sesi yapar) ---
+        function playShootSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
         // --- SAHNE KURULUMU ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a1a1a);
+        scene.background = new THREE.Color(0x202933); // Valorant koyu mavi/gri tonu
+        scene.fog = new THREE.Fog(0x202933, 10, 50);
+
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- IŞIKLANDIRMA ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        // --- DÜNYA (GRID VE ZEMİN) ---
+        const grid = new THREE.GridHelper(100, 50, 0xff4655, 0x444444);
+        scene.add(grid);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
-        const pointLight = new THREE.PointLight(0xffffff, 1);
-        camera.add(pointLight); // Işık kamerayı takip etsin
+
+        // --- SİLAH ---
+        const gun = new THREE.Mesh(
+            new THREE.BoxGeometry(0.15, 0.2, 0.8),
+            new THREE.MeshPhongMaterial({ color: 0x0f1923 })
+        );
+        gun.position.set(0.35, -0.3, -0.6);
+        camera.add(gun);
         scene.add(camera);
 
-        // --- ZEMİN VE DUVARLAR ---
-        const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(200, 200),
-            new THREE.MeshPhongMaterial({ color: 0x333333 })
-        );
-        floor.rotation.x = -Math.PI / 2;
-        scene.add(floor);
-
-        // --- SİLAH MODELİ (Basit bir Phantom/Vandal taslağı) ---
-        const gunGroup = new THREE.Group();
-        const bodyGeo = new THREE.BoxGeometry(0.2, 0.3, 1);
-        const gunMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
-        const gunBody = new THREE.Mesh(bodyGeo, gunMat);
-        
-        const barrelGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.8);
-        const barrel = new THREE.Mesh(barrelGeo, gunMat);
-        barrel.rotation.x = Math.PI / 2;
-        barrel.position.z = -0.7;
-        
-        gunGroup.add(gunBody);
-        gunGroup.add(barrel);
-        
-        // Silahı kameranın önüne yerleştir
-        gunGroup.position.set(0.4, -0.4, -0.8); 
-        camera.add(gunGroup);
-
-        // --- HAREKET VE KONTROLLER ---
+        // --- KONTROLLER ---
         let keys = {};
+        window.startGame = () => {
+            document.getElementById('start-screen').style.display = 'none';
+            document.body.requestPointerLock();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        };
+
         document.addEventListener('keydown', (e) => keys[e.code] = true);
         document.addEventListener('keyup', (e) => keys[e.code] = false);
-
         document.addEventListener('mousemove', (e) => {
-            if (document.pointerLockElement === document.body) {
+            if (document.pointerLockElement) {
                 camera.rotation.y -= e.movementX * 0.002;
                 camera.rotation.x -= e.movementY * 0.002;
-                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
             }
         });
 
-        // --- ATEŞ ETME MEKANİĞİ ---
-        function shoot() {
-            // Silah tepme efekti (Kickback)
-            gunGroup.position.z += 0.1;
-            
-            // Namlu ucundan mermi izi (Raycast)
-            const raycaster = new THREE.Raycaster();
-            const center = new THREE.Vector2(0, 0); // Ekran ortası
-            raycaster.setFromCamera(center, camera);
+        // --- ATEŞ ETME ---
+        document.addEventListener('mousedown', () => {
+            if (document.pointerLockElement && ammo > 0) {
+                ammo--;
+                document.getElementById('ammo-count').innerText = ammo;
+                playShootSound();
+                
+                // Tepme
+                gun.position.z += 0.05;
+                camera.rotation.x += 0.005;
 
-            // Mermi izi (Tracer)
-            const lineMat = new THREE.LineBasicMaterial({ color: 0xffff00 });
-            const points = [];
-            points.push(new THREE.Vector3(0.4, -0.4, -1)); // Namlu yaklaşık pozisyon
-            points.push(new THREE.Vector3(0, 0, -20)); // Gittiği yer
-            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-            const line = new THREE.Line(lineGeo, lineMat);
-            camera.add(line);
-            
-            // İzi kısa süre sonra sil
-            setTimeout(() => camera.remove(line), 50);
+                // Mermi İzi
+                const ray = new THREE.Raycaster();
+                ray.setFromCamera(new THREE.Vector2(0,0), camera);
+                const points = [new THREE.Vector3(0.3, -0.3, -0.5), new THREE.Vector3(0,0,-10)];
+                const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({color: 0xffffff}));
+                camera.add(line);
+                setTimeout(() => camera.remove(line), 30);
+            }
+        });
 
-            // Ekran flaşı
-            const flash =
+        // --- OYUN DÖNGÜSÜ ---
+        function animate() {
+            requestAnimationFrame(animate);
+            if (document.pointerLockElement) {
+                const speed = 0.1;
+                if (keys['KeyW']) camera.translateZ(-speed);
+                if (keys['KeyS']) camera.translateZ(speed);
+                if (keys['KeyA']) camera.translateX(-speed);
+                if (keys['KeyD']) camera.translateX(speed);
+                camera.position.y = 1.6;
+                gun.position.z += (-0.6 - gun.position.z) * 0.1; // Silahı geri çekme
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
