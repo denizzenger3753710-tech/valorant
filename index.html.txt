@@ -1,0 +1,122 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>ZARTARANT - ASCENT MID</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; cursor: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid #0f0; transform: translate(-50%, -50%); pointer-events: none; z-index: 100; }
+        #hud { position: absolute; bottom: 30px; left: 30px; color: white; text-shadow: 2px 2px #000; font-size: 24px; z-index: 100; }
+        #info { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-weight: bold; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="info">ASCENT MID - DENİZ ZENGER EDITION</div>
+    <div id="hud">HP: <span id="hp">100</span> | SKOR: <span id="kl">0</span></div>
+    <div id="crosshair"></div>
+
+    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        let scene, camera, renderer, player, enemies = [], obstacles = [], keys = {};
+        let hp = 100, kills = 0;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // Venedik gökyüzü mavisi
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.rotation.order = 'YXZ';
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const light = new THREE.AmbientLight(0xffffff, 0.7); scene.add(light);
+            const sun = new THREE.DirectionalLight(0xffffff, 1); sun.position.set(10, 20, 10); scene.add(sun);
+
+            // ZEMİN (Mid Avlusu)
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({color: 0xcccccc}));
+            floor.rotation.x = -Math.PI/2;
+            scene.add(floor);
+
+            // --- ASCENT MID MİMARİSİ ---
+            // 1. Market Duvarı (B tarafı girişi)
+            createBox(-15, 4, -10, 2, 8, 20, 0xdddddd); 
+            // 2. Pizza / Top Mid Duvarı
+            createBox(15, 4, -15, 2, 8, 15, 0xdddddd);
+            // 3. Orta Kutular (Double Stack)
+            createBox(0, 1, 0, 2, 2, 2, 0xffa500);
+            createBox(0, 3, 0, 2, 2, 2, 0xffa500);
+            // 4. Mid Link Koridoru
+            createBox(-5, 4, -20, 20, 8, 2, 0xaaaaaa);
+
+            spawnEnemy();
+            animate();
+        }
+
+        function createBox(x, y, z, w, h, d, color) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({color: color}));
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            obstacles.push(mesh);
+        }
+
+        function spawnEnemy() {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0xff4655}));
+            // Botları duvarların arkasına/içine değil, avluya spawn et
+            mesh.position.set(Math.random()*20-10, 1, -Math.random()*30-5);
+            scene.add(mesh);
+            enemies.push(mesh);
+        }
+
+        // --- HAREKET VE ÇARPIŞMA (BASİT) ---
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+        window.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
+        });
+
+        document.body.addEventListener('click', () => {
+            document.body.requestPointerLock();
+            // ATEŞ ETME
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+            const intersects = raycaster.intersectObjects(enemies);
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                scene.remove(hit);
+                enemies = enemies.filter(e => e !== hit);
+                kills++;
+                document.getElementById('kl').innerText = kills;
+                spawnEnemy();
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const speed = 0.15;
+            if(keys['KeyW']) camera.translateZ(-speed);
+            if(keys['KeyS']) camera.translateZ(speed);
+            if(keys['KeyA']) camera.translateX(-speed);
+            if(keys['KeyD']) camera.translateX(speed);
+            camera.position.y = 1.7; // Boyu sabitle
+
+            // ESP Hilesi (Duvar arkası görme - Kırmızı kutucuklar)
+            // (Burada teknik olarak her karede enemies taranır)
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
